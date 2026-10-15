@@ -1,0 +1,1 @@
+Collection now reuses directory results when multiple test files from the same directory are passed as separate command-line arguments, avoiding repeated traversal.

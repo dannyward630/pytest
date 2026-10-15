@@ -992,7 +992,12 @@ class Session(nodes.Collector):
                 else:
                     # For backward compat, files given directly multiple
                     # times on the command line should not be deduplicated.
-                    handle_dupes = not (
+                    # Cache the parent directory unless --keep-duplicates is
+                    # enabled; genitems re-collects files.
+                    handle_dupes = (
+                        isinstance(matchnode, nodes.Directory)
+                        and not self.config.getoption("keepduplicates")
+                    ) or not (
                         len(matchparts) == 1
                         and isinstance(matchparts[0], Path)
                         and matchparts[0].is_file()

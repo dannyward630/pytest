@@ -2142,6 +2142,77 @@ class TestOverlappingCollectionArguments:
             consecutive=True,
         )
 
+    def test_multiple_file_args_collect_directory_once(
+        self, pytester: Pytester
+    ) -> None:
+        """Test that distinct file arguments don't re-collect their directory."""
+        pytester.makepyfile(
+            **{
+                "a/test_a.py": "def test_a(): pass",
+                "a/test_b.py": "def test_b(): pass",
+                "a/test_c.py": "def test_c(): pass",
+            }
+        )
+        pytester.makeconftest(
+            """
+            from collections import Counter
+
+            calls = Counter()
+
+            def pytest_collect_file(file_path, parent):
+                if file_path.parent.name == "a":
+                    calls[file_path.name] += 1
+
+            def pytest_collection_finish(session):
+                print(
+                    "collect-file calls:",
+                    *(f"{name}={calls[name]}" for name in sorted(calls)),
+                )
+            """
+        )
+
+        result = pytester.runpytest("--collect-only", "a/test_a.py", "a/test_b.py")
+
+        result.stdout.fnmatch_lines(
+            [
+                "<Dir *>",
+                "  <Dir a>",
+                "    <Module test_a.py>",
+                "      <Function test_a>",
+                "    <Module test_b.py>",
+                "      <Function test_b>",
+                "collect-file calls: test_a.py=1 test_b.py=1 test_c.py=1",
+                "",
+            ],
+            consecutive=True,
+        )
+        assert result.ret == ExitCode.OK
+
+    def test_keep_duplicates_for_file_arguments(self, pytester: Pytester) -> None:
+        """Test that --keep-duplicates still creates separate file collectors."""
+        pytester.makepyfile(**{"a/test_a.py": "def test_a(): pass"})
+
+        result = pytester.runpytest(
+            "--collect-only",
+            "--keep-duplicates",
+            "a/test_a.py",
+            "a/test_a.py",
+        )
+
+        result.stdout.fnmatch_lines(
+            [
+                "<Dir *>",
+                "  <Dir a>",
+                "    <Module test_a.py>",
+                "      <Function test_a>",
+                "    <Module test_a.py>",
+                "      <Function test_a>",
+                "",
+            ],
+            consecutive=True,
+        )
+        assert result.ret == ExitCode.OK
+
     def test_keep_duplicates_flag(self, pytester: Pytester) -> None:
         """Test that --keep-duplicates allows duplication."""
         pytester.makepyfile(
