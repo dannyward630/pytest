@@ -1,0 +1,1 @@
+Avoid repeatedly collecting the same parent directory when multiple test files are passed explicitly.

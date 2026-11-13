@@ -991,12 +991,18 @@ class Session(nodes.Collector):
                     subnodes = matchnode._collect_path(matchparts[0], path_cache)
                 else:
                     # For backward compat, files given directly multiple
-                    # times on the command line should not be deduplicated.
-                    handle_dupes = not (
+                    # times on the command line should not be deduplicated. But
+                    # cache Directory collection when resolving explicit file
+                    # arguments to avoid rescanning the same parent directory.
+                    file_arg_leaf = (
                         len(matchparts) == 1
                         and isinstance(matchparts[0], Path)
                         and matchparts[0].is_file()
                     )
+                    handle_dupes = (
+                        isinstance(matchnode, nodes.Directory)
+                        and not self.config.getoption("keepduplicates")
+                    ) or not file_arg_leaf
                     rep, duplicate = self._collect_one_node(matchnode, handle_dupes)
                     if not duplicate and not rep.passed:
                         # Report collection failures here to avoid failing to

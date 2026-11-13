@@ -2142,6 +2142,45 @@ class TestOverlappingCollectionArguments:
             consecutive=True,
         )
 
+    def test_multiple_explicit_files_collect_parent_once(
+        self, pytester: Pytester
+    ) -> None:
+        """Explicit files in one directory should share directory collection."""
+        pytester.makeconftest(
+            """
+            from pathlib import Path
+
+            collected = []
+
+            def pytest_collect_file(file_path, parent):
+                if file_path.suffix == ".py":
+                    collected.append(file_path.name)
+
+            def pytest_sessionfinish(session):
+                Path("collect_file_calls.txt").write_text(",".join(collected))
+            """
+        )
+        pytester.makepyfile(
+            **{f"test_{i}.py": f"def test_{i}(): pass" for i in range(8)}
+        )
+        files = sorted(pytester.path.glob("test_*.py"))
+
+        result = pytester.runpytest("--collect-only", *files)
+
+        assert result.ret == 0
+        assert sorted(
+            (pytester.path / "collect_file_calls.txt").read_text().split(",")
+        ) == sorted(["conftest.py", *(path.name for path in files)])
+
+    def test_keep_duplicates_for_explicit_file(self, pytester: Pytester) -> None:
+        """--keep-duplicates should still repeat an explicitly named file."""
+        path = pytester.makepyfile("def test_a(): pass")
+
+        result = pytester.runpytest("--collect-only", "--keep-duplicates", path, path)
+
+        assert result.ret == 0
+        result.stdout.fnmatch_lines(["*2 tests collected*"])
+
     def test_keep_duplicates_flag(self, pytester: Pytester) -> None:
         """Test that --keep-duplicates allows duplication."""
         pytester.makepyfile(
